@@ -1,0 +1,23 @@
+# 原始 DEM（可达数 GB），不提交
+raw/
+
+# 本地验收临时脚本
+.tmp-pw/
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 可选：若你希望 data/ 由脚本重建而非提交，取消下一行注释
+# data/elev.bin
+# data/elev.bin.gz
+.playwright-cli/

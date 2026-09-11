@@ -1,0 +1,18 @@
+{
+  "width": 4320,
+  "height": 2160,
+  "dtype": "int16",
+  "endianness": "little",
+  "rowOrder": "north-to-south",
+  "lonMin": -180,
+  "lonMax": 180,
+  "latMax": 90,
+  "latMin": -90,
+  "source": "ETOPO 2022 Bedrock",
+  "sourceDoi": "10.25921/fd45-gt74",
+  "resampledFrom": "60s",
+  "minElev": -10470,
+  "maxElev": 6560,
+  "landFractionSl0WeightedPct": 27.651,
+  "generatedAt": "2026-09-11T06:37:09.462262+00:00"
+}

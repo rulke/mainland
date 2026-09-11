@@ -1,0 +1,16 @@
+# mainland-slr 环境说明
+# 本机 conda 官方/清华源 SSL 失败时的降级方案（已执行）：
+#   1. 使用 miniconda pkgs 缓存中的 python-3.12.13
+#   2. python -m venv --without-pip 建到 miniconda3/envs/mainland-slr
+#   3. 用可用的 pip --prefix 安装依赖（勿指向 MIMO_PYTHON）
+#
+# 网络正常时，推荐：
+#   conda env create -f environment.yml
+name: mainland-slr
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - numpy>=2.0
+  - pillow>=10.0
+  - requests>=2.28
