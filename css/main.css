@@ -1,5 +1,29 @@
-/* DESIGN.md tokens — dark default + atlas */
-:root,
+/* DESIGN.md tokens — atlas (浅色) default + dark */
+[data-theme="atlas"],
+:root {
+  --bg-void: #f4f0e6;
+  --bg-canvas: #ede8dc;
+  --bg-panel: #f8f5ec;
+  --bg-panel-2: #ffffff;
+  --bg-inset: #e8e2d4;
+  --bg-glass: rgba(248, 245, 236, 0.9);
+  --border-subtle: #d9d0bc;
+  --border-default: #c9c0ae;
+  --border-strong: #a89878;
+  --text-primary: #1a2430;
+  --text-secondary: #4a5568;
+  --text-muted: #7a8699;
+  --text-inverse: #f8f5ec;
+  --accent-amber: #b8860b;
+  --accent-amber-2: #d4a017;
+  --accent-cyan: #0e7490;
+  --accent-flood: #c2414b;
+  --accent-ok: #0f766e;
+  --focus-ring: #0284c7;
+  --grid-line: #d9d0bc;
+  --shadow: 0 8px 24px rgba(60, 50, 30, 0.12);
+}
+
 [data-theme="dark"] {
   --bg-void: #070b12;
   --bg-canvas: #0b1220;
@@ -22,27 +46,6 @@
   --focus-ring: #7dd3fc;
   --grid-line: #1a2438;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-}
-
-[data-theme="atlas"] {
-  --bg-void: #f4f0e6;
-  --bg-canvas: #ede8dc;
-  --bg-panel: #f8f5ec;
-  --bg-panel-2: #ffffff;
-  --bg-inset: #e8e2d4;
-  --bg-glass: rgba(248, 245, 236, 0.9);
-  --border-subtle: #d9d0bc;
-  --border-default: #c9c0ae;
-  --border-strong: #a89878;
-  --text-primary: #1a2430;
-  --text-secondary: #4a5568;
-  --text-muted: #7a8699;
-  --text-inverse: #f8f5ec;
-  --accent-amber: #b8860b;
-  --accent-amber-2: #d4a017;
-  --accent-cyan: #0e7490;
-  --accent-flood: #c2414b;
-  --shadow: 0 8px 24px rgba(60, 50, 30, 0.12);
 }
 
 * {
@@ -98,6 +101,78 @@ input {
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
+}
+
+.title-block {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.layer-menu {
+  position: relative;
+}
+
+.layer-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 148px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-pop[hidden] {
+  display: none !important;
+}
+
+.layer-pop label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-icon {
+  min-width: 36px;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.stats.is-collapsed {
+  display: none;
+}
+
+.body:has(.stats.is-collapsed) {
+  grid-template-columns: 1fr;
+}
+
+.presets.is-collapsed {
+  display: none;
+}
+
+.dock.presets-collapsed {
+  padding-bottom: 10px;
+}
+
+.btn-collapse {
+  margin-left: auto;
 }
 
 .chip {

@@ -44,6 +44,7 @@ export class MapRenderer {
       colorblind = false,
       showGhost = true,
       ghostAlpha = 0.35,
+      theme = "atlas",
     } = opts;
     const { elev, w, h, image, ghost } = this;
     const data = image.data;
@@ -87,13 +88,21 @@ export class MapRenderer {
     }
 
     if (showGhost) {
+      // light theme: darken; dark theme: lighten
+      const lighten = theme !== "atlas";
       const a = Math.round(255 * ghostAlpha);
       for (let p = 0, n = w * h; p < n; p++) {
         if (!ghost[p]) continue;
         const o = p * 4;
-        data[o] = Math.min(255, data[o] + a);
-        data[o + 1] = Math.min(255, data[o + 1] + a);
-        data[o + 2] = Math.min(255, data[o + 2] + a);
+        if (lighten) {
+          data[o] = Math.min(255, data[o] + a);
+          data[o + 1] = Math.min(255, data[o + 1] + a);
+          data[o + 2] = Math.min(255, data[o + 2] + a);
+        } else {
+          data[o] = Math.max(0, data[o] - a);
+          data[o + 1] = Math.max(0, data[o + 1] - a);
+          data[o + 2] = Math.max(0, data[o + 2] - a);
+        }
       }
     }
 
@@ -101,23 +110,31 @@ export class MapRenderer {
     return this.off;
   }
 
-  /** Draw offscreen DEM onto a view canvas with zoom/pan. */
-  drawTo(view, zoom, cx, cy, smooth) {
+  /** Draw offscreen DEM onto a view canvas with zoom/pan + lon wrap. */
+  drawTo(view, zoom, cx, cy, smooth, bg = "#0B1220") {
     const ctx = view.getContext("2d");
     const vw = view.width;
     const vh = view.height;
     ctx.imageSmoothingEnabled = smooth;
-    ctx.fillStyle = "#0B1220";
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, vw, vh);
-    // fit height at zoom=1 to full world, width may letterbox
     const baseScale = vh / this.h;
     const s = baseScale * zoom;
     const dw = this.w * s;
     const dh = this.h * s;
-    // cx, cy are world pixel coords at center
-    const dx = vw / 2 - cx * s;
+    // wrap cx into [0, w)
+    const wx = ((cx % this.w) + this.w) % this.w;
+    const dx = vw / 2 - wx * s;
     const dy = vh / 2 - cy * s;
+    // draw copies so horizontal wrap has no black gap
     ctx.drawImage(this.off, dx, dy, dw, dh);
-    return { s, dx, dy, dw, dh };
+    if (dx > 0) ctx.drawImage(this.off, dx - dw, dy, dw, dh);
+    if (dx + dw < vw) ctx.drawImage(this.off, dx + dw, dy, dw, dh);
+    // edge fade into void (soft, not hard black)
+    const gradL = ctx.createLinearGradient(0, 0, Math.min(80, vw * 0.06), 0);
+    gradL.addColorStop(0, bg);
+    gradL.addColorStop(1, "rgba(0,0,0,0)");
+    // only if world doesn't fully cover — at high zoom cover always true
+    return { s, dx, dy, dw, dh, wx };
   }
 }

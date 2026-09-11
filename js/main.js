@@ -1,25 +1,31 @@
 import { MapRenderer } from "./map-render.js";
 import { makeLandFraction, sampleElev, pxToLonLat } from "./geo-utils.js";
-import { buildUI, PRESETS, ICE, snapSeaLevel } from "./ui.js";
+import { buildUI, PRESETS, ICE, snapSeaLevel, loadPrefs, savePrefs } from "./ui.js";
+import { drawOverlays, loadGeoJson } from "./overlays.js";
+
+const prefs = loadPrefs();
 
 const state = {
   seaLevel: 0,
   landBase: null,
-  theme: "dark",
+  theme: prefs.theme,
   colorblind: false,
-  showGhost: true,
   zoom: 1,
   cx: 0,
   cy: 0,
   elev: null,
   meta: null,
   annotations: [],
+  layers: { ...prefs.layers },
+  statsOpen: prefs.statsOpen,
+  presetsOpen: prefs.presetsOpen,
   ice: { gis: false, wais: false, eais: false, glacier: false },
   dragging: false,
   lastX: 0,
   lastY: 0,
   needRender: true,
   landPctFn: null,
+  geo: { countries: null, cities: null, chinaProv: null, prefectures: null },
 };
 
 let ui, renderer, view, minimapImg;
@@ -55,6 +61,19 @@ async function loadElev() {
   return { meta, elev: new Int16Array(buf) };
 }
 
+function persist() {
+  savePrefs({
+    theme: state.theme,
+    statsOpen: state.statsOpen,
+    presetsOpen: state.presetsOpen,
+    layers: state.layers,
+  });
+}
+
+function bgForTheme() {
+  return state.theme === "atlas" ? "#EDE8DC" : "#0B1220";
+}
+
 function resizeCanvas() {
   const wrap = view.parentElement;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -67,21 +86,28 @@ function resizeCanvas() {
   state.needRender = true;
 }
 
+/** Longitude wrap + latitude soft clamp. */
 function clampPan() {
   const { meta, zoom } = state;
-  const maxX = meta.width / 2;
-  const maxY = meta.height / 2;
-  // allow some slack
-  state.cx = Math.min(meta.width + 200, Math.max(-200, state.cx));
-  state.cy = Math.min(meta.height + 100, Math.max(-100, state.cy));
+  const W = meta.width;
+  const H = meta.height;
+  state.cx = ((state.cx % W) + W) % W;
+  const s = (view.height / H) * zoom;
+  const viewH = view.height / s;
+  if (viewH >= H) {
+    state.cy = H / 2;
+  } else {
+    const over = viewH * 0.1;
+    state.cy = Math.max(-over, Math.min(H - viewH + over, state.cy));
+  }
 }
 
-function drawMinimapOverlay(s, dx, dy, dw, dh) {
+function drawMinimapOverlay() {
   const mc = ui.els.minimapC;
   const mctx = mc.getContext("2d");
   mctx.clearRect(0, 0, mc.width, mc.height);
   if (minimapImg) mctx.drawImage(minimapImg, 0, 0, mc.width, mc.height);
-  // view rect in world px: visible world width = view.width / s
+  const s = (view.height / state.meta.height) * state.zoom;
   const vw = view.width / s;
   const vh = view.height / s;
   const x0 = state.cx - vw / 2;
@@ -90,20 +116,34 @@ function drawMinimapOverlay(s, dx, dy, dw, dh) {
   const ry = (y0 / state.meta.height) * mc.height;
   const rw = (vw / state.meta.width) * mc.width;
   const rh = (vh / state.meta.height) * mc.height;
-  mctx.strokeStyle = "rgba(255,255,255,0.9)";
+  mctx.strokeStyle = "rgba(255,255,255,0.95)";
   mctx.lineWidth = 1;
   mctx.strokeRect(rx + 0.5, ry + 0.5, rw, rh);
+  // wrap copies of view box
+  if (rx < 0) mctx.strokeRect(rx + mc.width + 0.5, ry + 0.5, rw, rh);
+  if (rx + rw > mc.width) mctx.strokeRect(rx - mc.width + 0.5, ry + 0.5, rw, rh);
 }
 
 function paint() {
   if (!renderer || !state.elev) return;
-  const off = renderer.render(state.seaLevel, {
+  renderer.render(state.seaLevel, {
     colorblind: state.colorblind,
-    showGhost: state.showGhost,
+    showGhost: state.layers.ghost,
+    theme: state.theme,
   });
   const smooth = state.zoom <= 4;
-  const t = renderer.drawTo(view, state.zoom, state.cx, state.cy, smooth);
-  drawMinimapOverlay(t.s, t.dx, t.dy, t.dw, t.dh);
+  const t = renderer.drawTo(view, state.zoom, state.cx, state.cy, smooth, bgForTheme());
+  const ctx = view.getContext("2d");
+  drawOverlays(ctx, state.geo, t, {
+    gridW: state.meta.width,
+    gridH: state.meta.height,
+    theme: state.theme,
+    zoom: state.zoom,
+    showCities: state.layers.cities,
+    showChina: state.layers.china,
+    showContinents: state.layers.continents,
+  });
+  drawMinimapOverlay();
 
   const badge = ui.els.zoomBadge;
   if (state.zoom > 4) {
@@ -142,12 +182,17 @@ function applyIce(keys) {
 
 function bindMapEvents() {
   const el = view;
-  el.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
-    state.zoom = Math.min(12, Math.max(1, state.zoom * factor));
-    state.needRender = true;
-  }, { passive: false });
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+      state.zoom = Math.min(12, Math.max(1, state.zoom * factor));
+      clampPan();
+      state.needRender = true;
+    },
+    { passive: false }
+  );
 
   el.addEventListener("pointerdown", (e) => {
     state.dragging = true;
@@ -159,13 +204,13 @@ function bindMapEvents() {
     const rect = el.getBoundingClientRect();
     const scaleX = el.width / rect.width;
     const scaleY = el.height / rect.height;
-    // hover HUD
     const s = (el.height / state.meta.height) * state.zoom;
     const wx = (e.clientX - rect.left) * scaleX;
     const wy = (e.clientY - rect.top) * scaleY;
-    const cx = state.cx + (wx - el.width / 2) / s;
+    let cx = state.cx + (wx - el.width / 2) / s;
     const cy = state.cy + (wy - el.height / 2) / s;
-    if (cx >= 0 && cx < state.meta.width && cy >= 0 && cy < state.meta.height) {
+    cx = ((cx % state.meta.width) + state.meta.width) % state.meta.width;
+    if (cy >= 0 && cy < state.meta.height) {
       const { lon, lat } = pxToLonLat(cx, cy, state.meta.width, state.meta.height);
       const elev = sampleElev(state.elev, state.meta.width, state.meta.height, lon, lat);
       const sl = state.seaLevel;
@@ -207,10 +252,10 @@ function bindMapEvents() {
   el.addEventListener("dblclick", (e) => {
     if (e.shiftKey) state.zoom = Math.max(1, state.zoom / 1.5);
     else state.zoom = Math.min(12, state.zoom * 1.5);
+    clampPan();
     state.needRender = true;
   });
 
-  // minimap click/drag pan
   const mm = ui.els.minimapC;
   const mmPan = (e) => {
     const rect = mm.getBoundingClientRect();
@@ -218,6 +263,7 @@ function bindMapEvents() {
     const fy = (e.clientY - rect.top) / rect.height;
     state.cx = fx * state.meta.width;
     state.cy = fy * state.meta.height;
+    clampPan();
     state.needRender = true;
   };
   mm.addEventListener("pointerdown", (e) => {
@@ -245,59 +291,92 @@ async function boot() {
     onStep: (d) => applySeaLevel(Math.round((state.seaLevel + d) * 10) / 10),
     onIce: applyIce,
     onToggleTheme: () => {
-      state.theme = state.theme === "dark" ? "atlas" : "dark";
-      document.documentElement.dataset.theme = state.theme;
-      ui.setThemeButton(state.theme === "atlas");
+      state.theme = state.theme === "atlas" ? "dark" : "atlas";
+      ui.applyPanelState({
+        theme: state.theme,
+        statsOpen: state.statsOpen,
+        presetsOpen: state.presetsOpen,
+        layers: state.layers,
+      });
+      persist();
+      state.needRender = true;
     },
     onToggleCb: () => {
       state.colorblind = !state.colorblind;
       ui.setCbButton(state.colorblind);
       state.needRender = true;
     },
-    onToggleGhost: () => {
-      state.showGhost = !state.showGhost;
-      ui.setGhostButton(state.showGhost);
+    onToggleStats: () => {
+      state.statsOpen = !state.statsOpen;
+      ui.applyPanelState({
+        theme: state.theme,
+        statsOpen: state.statsOpen,
+        presetsOpen: state.presetsOpen,
+        layers: state.layers,
+      });
+      persist();
+      resizeCanvas();
+    },
+    onTogglePresets: () => {
+      state.presetsOpen = !state.presetsOpen;
+      ui.applyPanelState({
+        theme: state.theme,
+        statsOpen: state.statsOpen,
+        presetsOpen: state.presetsOpen,
+        layers: state.layers,
+      });
+      persist();
+      resizeCanvas();
+    },
+    onLayer: (key, on) => {
+      state.layers[key] = on;
+      persist();
       state.needRender = true;
     },
   });
-  ui.setGhostButton(true);
+  ui.applyPanelState({
+    theme: state.theme,
+    statsOpen: state.statsOpen,
+    presetsOpen: state.presetsOpen,
+    layers: state.layers,
+  });
 
   view = ui.els.map;
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
 
   try {
-    const [{ meta, elev }, annotations] = await Promise.all([
-      loadElev(),
-      fetchJson("./data/annotations.json").catch(() => []),
-    ]);
+    const [{ meta, elev }, annotations, countries, cities, chinaProv, prefectures] =
+      await Promise.all([
+        loadElev(),
+        fetchJson("./data/annotations.json").catch(() => []),
+        loadGeoJson("./data/geo/countries_110m.geojson"),
+        loadGeoJson("./data/geo/populated_places_110m.geojson"),
+        loadGeoJson("./data/geo/china_provinces.geojson"),
+        loadGeoJson("./data/geo/china_prefectures.geojson"),
+      ]);
     state.meta = meta;
     state.elev = elev;
     state.annotations = annotations;
+    state.geo = { countries, cities, chinaProv, prefectures };
     state.cx = meta.width / 2;
     state.cy = meta.height / 2;
     state.landPctFn = makeLandFraction(elev, meta.width, meta.height);
     state.landBase = state.landPctFn(0);
     renderer = new MapRenderer(elev, meta.width, meta.height);
 
-    // minimap image
     minimapImg = new Image();
     minimapImg.src = "./data/elev-min.png";
 
-    if (state.landBase < 27 || state.landBase > 32) {
-      console.warn("land fraction out of range", state.landBase);
-    }
-
     bindMapEvents();
     applySeaLevel(0, true);
-    // default preset desc
     const now = PRESETS.find((p) => p.id === "now");
     ui.els.sceneDesc.textContent = now.desc;
     loop();
   } catch (err) {
     console.error(err);
     ui.showError(
-      "高程数据加载失败。请通过 HTTP 访问（python -m http.server），并确认 data/ 目录完整。"
+      "高程数据加载失败。请通过 HTTP 访问（scripts/serve.py），并确认 data/ 目录完整。"
     );
   }
 }
