@@ -45,10 +45,11 @@ export function makeLandFraction(elev, width, height) {
   };
 }
 
-export function formatSeaLevel(sl) {
+export function formatSeaLevel(sl, experimental = false) {
   const sign = sl > 0 ? "+" : sl < 0 ? "−" : "+";
-  const v = Math.abs(sl).toFixed(1);
-  return `${sign}${v} m`;
+  const abs = Math.abs(sl);
+  const digits = experimental && abs >= 10 ? 0 : 1;
+  return `${sign}${abs.toFixed(digits)} m`;
 }
 
 export function seaLevelNote(sl) {

@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Download China prefecture-level boundaries from DataV and merge to one GeoJSON."""
+"""Download China prefecture-level admin units (~333). Exclude districts/counties."""
 from __future__ import annotations
 
 import json
+import subprocess
 import time
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "data" / "geo" / "china_prefectures.geojson"
+GEO = ROOT / "data" / "geo"
+CACHE = GEO / "_pref_cache"
+OUT = GEO / "china_prefectures.geojson"
 
-# Province adcodes (mainland + 港澳台 as available)
+# Province-level adcodes
+MUNICIPALITIES = {110000, 120000, 310000, 500000}  # 京津沪渝
+SPECIAL = {810000, 820000, 710000}  # 港澳台 outline-only
+
 PROVINCES = [
     110000, 120000, 130000, 140000, 150000, 210000, 220000, 230000,
     310000, 320000, 330000, 340000, 350000, 360000, 370000, 410000,
@@ -18,55 +23,144 @@ PROVINCES = [
     530000, 540000, 610000, 620000, 630000, 640000, 650000, 710000,
     810000, 820000,
 ]
-UA = {"User-Agent": "MainlandViz/1.0"}
 
 
-def fetch(url: str) -> dict:
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read().decode("utf-8"))
+def curl_json(url: str, dest: Path) -> bool:
+    if dest.exists() and dest.stat().st_size > 2000:
+        return True
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "curl.exe", "-sS", "-L", "--retry", "4", "--retry-delay", "2",
+        "-A", "MainlandViz/1.0", "-o", str(dest), url,
+    ]
+    r = subprocess.run(cmd, capture_output=True)
+    ok = r.returncode == 0 and dest.exists() and dest.stat().st_size > 2000
+    if not ok:
+        print(f"  curl fail {url} rc={r.returncode}")
+    return ok
+
+
+def is_prefecture_code(adcode: str) -> bool:
+    """PPCC00 where CC!=00 → prefecture-level city/prefecture/league/area."""
+    if len(adcode) != 6 or not adcode.isdigit():
+        return False
+    if adcode.endswith("0000"):
+        return False  # province
+    if adcode.endswith("00"):
+        return True  # last two 00, not province → city/prefecture/league
+    return False  # district / county-level
+
+
+def is_province_code(adcode: str) -> bool:
+    return len(adcode) == 6 and adcode.isdigit() and adcode.endswith("0000")
 
 
 def main() -> int:
     features = []
+    seen = set()
+
     for code in PROVINCES:
-        url = f"https://geo.datav.aliyun.com/areas_v3/bound/{code}_full.json"
-        try:
-            data = fetch(url)
-        except Exception as e:  # noqa: BLE001
-            print(f"FAIL {code}: {e}")
-            time.sleep(0.5)
+        cache_path = CACHE / f"{code}.json"
+        # Taiwan / some SAR: _full may 404; outline always works for special
+        if code in SPECIAL:
+            url = f"https://geo.datav.aliyun.com/areas_v3/bound/{code}.json"
+            cache_path = CACHE / f"{code}_outline.json"
+        else:
+            url = f"https://geo.datav.aliyun.com/areas_v3/bound/{code}_full.json"
+        print(f"GET {code}", flush=True)
+        if not curl_json(url, cache_path):
+            time.sleep(0.3)
             continue
+        try:
+            data = json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            print(f"  parse fail {code}: {e}")
+            continue
+
         feats = data.get("features") or []
-        n = 0
-        for f in feats:
-            # keep prefecture/city level, skip nested districts if present as points
-            props = f.get("properties") or {}
-            name = props.get("name") or ""
-            level = props.get("level") or ""
-            # DataV _full for province returns the province + its children
-            adcode = str(props.get("adcode") or "")
-            if adcode and adcode.endswith("0000") and adcode != str(code):
+        kept = 0
+
+        # Municipalities / SAR / Taiwan: keep only province outline
+        if code in MUNICIPALITIES or code in SPECIAL:
+            outline = CACHE / f"{code}_outline.json"
+            ok = curl_json(
+                f"https://geo.datav.aliyun.com/areas_v3/bound/{code}.json",
+                outline,
+            )
+            if not ok:
+                print(f"  outline missing {code}")
+                time.sleep(0.1)
                 continue
-            # drop the province outline itself when children exist
-            if adcode == str(code) and len(feats) > 1:
+            try:
+                od = json.loads(outline.read_text(encoding="utf-8"))
+            except Exception as e:  # noqa: BLE001
+                print(f"  outline parse fail {code}: {e}")
                 continue
-            if f.get("geometry"):
+            for f in od.get("features") or []:
+                props = f.get("properties") or {}
+                ad = str(props.get("adcode") or code)
+                if not f.get("geometry") or ad in seen:
+                    continue
                 f["properties"] = {
-                    "adcode": props.get("adcode"),
-                    "name": name,
-                    "level": level or "city",
-                    "parent": code,
+                    "adcode": props.get("adcode") or code,
+                    "name": props.get("name") or "",
+                    "level": "province",
+                    "centroid": props.get("centroid") or props.get("center"),
+                    "parent": None,
                 }
                 features.append(f)
-                n += 1
-        print(f"ok {code}: +{n} (raw {len(feats)})")
-        time.sleep(0.15)
+                seen.add(ad)
+                kept += 1
+            print(f"  municipality/special outline +{kept}")
+            time.sleep(0.1)
+            continue
+
+        for f in feats:
+            props = f.get("properties") or {}
+            ad = str(props.get("adcode") or "")
+            if not f.get("geometry") or not ad or ad in seen:
+                continue
+            # drop province outline when children exist
+            if is_province_code(ad):
+                continue
+            if not is_prefecture_code(ad):
+                continue
+            name = props.get("name") or ""
+            # hard exclude residual non-prefecture names
+            if name.endswith("区") or name.endswith("县") or name.endswith("旗"):
+                continue
+            if name.endswith("市") or name.endswith("自治州") or name.endswith("地区") or name.endswith("盟"):
+                pass
+            else:
+                # e.g. 省直辖县级行政区划 — skip
+                continue
+            c = props.get("centroid") or props.get("center")
+            f["properties"] = {
+                "adcode": props.get("adcode"),
+                "name": name,
+                "level": "city",
+                "centroid": c,
+                "parent": code,
+            }
+            features.append(f)
+            seen.add(ad)
+            kept += 1
+        print(f"  +{kept}")
+        time.sleep(0.08)
 
     out = {"type": "FeatureCollection", "features": features}
     OUT.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     print(f"saved {OUT} features={len(features)} bytes={OUT.stat().st_size}")
-    return 0 if features else 1
+
+    # summary
+    by_parent: dict[str, int] = {}
+    for f in features:
+        p = str(f["properties"].get("parent") or f["properties"].get("adcode"))
+        by_parent[p] = by_parent.get(p, 0) + 1
+    print("by parent", dict(sorted(by_parent.items())))
+    names = [f["properties"]["name"] for f in features]
+    print("sample", names[:15], "...", names[-10:])
+    return 0
 
 
 if __name__ == "__main__":

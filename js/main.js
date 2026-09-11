@@ -1,6 +1,17 @@
 import { MapRenderer } from "./map-render.js";
 import { makeLandFraction, sampleElev, pxToLonLat } from "./geo-utils.js";
-import { buildUI, PRESETS, ICE, snapSeaLevel, loadPrefs, savePrefs } from "./ui.js";
+import {
+  buildUI,
+  PRESETS,
+  ICE,
+  snapSeaLevel,
+  clampSeaLevel,
+  expStep,
+  loadPrefs,
+  savePrefs,
+  SCI_MIN,
+  SCI_MAX,
+} from "./ui.js";
 import { drawOverlays, loadGeoJson } from "./overlays.js";
 
 const prefs = loadPrefs();
@@ -10,6 +21,7 @@ const state = {
   landBase: null,
   theme: prefs.theme,
   colorblind: false,
+  experimental: prefs.experimental,
   zoom: 1,
   cx: 0,
   cy: 0,
@@ -25,6 +37,7 @@ const state = {
   lastY: 0,
   needRender: true,
   landPctFn: null,
+  lastScienceLevel: 0,
   geo: { countries: null, cities: null, chinaProv: null, prefectures: null },
 };
 
@@ -66,12 +79,23 @@ function persist() {
     theme: state.theme,
     statsOpen: state.statsOpen,
     presetsOpen: state.presetsOpen,
+    experimental: state.experimental,
     layers: state.layers,
   });
 }
 
 function bgForTheme() {
   return state.theme === "atlas" ? "#EDE8DC" : "#0B1220";
+}
+
+function panelPrefs() {
+  return {
+    theme: state.theme,
+    statsOpen: state.statsOpen,
+    presetsOpen: state.presetsOpen,
+    experimental: state.experimental,
+    layers: state.layers,
+  };
 }
 
 function resizeCanvas() {
@@ -86,7 +110,6 @@ function resizeCanvas() {
   state.needRender = true;
 }
 
-/** Longitude wrap + latitude soft clamp. */
 function clampPan() {
   const { meta, zoom } = state;
   const W = meta.width;
@@ -119,7 +142,6 @@ function drawMinimapOverlay() {
   mctx.strokeStyle = "rgba(255,255,255,0.95)";
   mctx.lineWidth = 1;
   mctx.strokeRect(rx + 0.5, ry + 0.5, rw, rh);
-  // wrap copies of view box
   if (rx < 0) mctx.strokeRect(rx + mc.width + 0.5, ry + 0.5, rw, rh);
   if (rx + rw > mc.width) mctx.strokeRect(rx - mc.width + 0.5, ry + 0.5, rw, rh);
 }
@@ -142,6 +164,7 @@ function paint() {
     showCities: state.layers.cities,
     showChina: state.layers.china,
     showContinents: state.layers.continents,
+    showCountryNames: state.layers.countryNames,
   });
   drawMinimapOverlay();
 
@@ -161,10 +184,15 @@ function activeAnnotations() {
 }
 
 function applySeaLevel(sl, fromPreset) {
-  state.seaLevel = Math.max(-150, Math.min(80, sl));
-  if (!fromPreset) state.seaLevel = snapSeaLevel(state.seaLevel);
+  state.seaLevel = clampSeaLevel(sl, state.experimental);
+  if (!fromPreset) {
+    state.seaLevel = snapSeaLevel(state.seaLevel, state.experimental);
+  }
+  if (!state.experimental) {
+    state.lastScienceLevel = state.seaLevel;
+  }
   const pct = state.landPctFn(state.seaLevel);
-  ui.setSeaLevelUI(state.seaLevel, pct, state.landBase);
+  ui.setSeaLevelUI(state.seaLevel, pct, state.landBase, state.experimental);
   ui.setAnnotations(activeAnnotations());
   state.needRender = true;
 }
@@ -178,6 +206,54 @@ function applyIce(keys) {
   }
   ui.setIceSum(sum);
   if (keys.length) applySeaLevel(Math.round(sum * 10) / 10, true);
+}
+
+function setExperimental(on) {
+  state.experimental = on;
+  ui.applySliderRange(on);
+  ui.applyPanelState(panelPrefs());
+  persist();
+  if (!on) {
+    // restore last science value, clamped
+    applySeaLevel(state.lastScienceLevel, true);
+  } else {
+    applySeaLevel(state.seaLevel, true);
+  }
+}
+
+function onKeyDown(e) {
+  const exp = state.experimental;
+  let step = exp ? expStep(state.seaLevel) : 0.1;
+  if (e.shiftKey) step *= 5;
+  else if (e.ctrlKey || e.metaKey) step *= 20;
+
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    applySeaLevel(Math.round((state.seaLevel - step) * 10) / 10);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    applySeaLevel(Math.round((state.seaLevel + step) * 10) / 10);
+  } else if (e.key === "PageUp") {
+    e.preventDefault();
+    applySeaLevel(state.seaLevel + (exp ? expStep(state.seaLevel) * 5 : 5));
+  } else if (e.key === "PageDown") {
+    e.preventDefault();
+    applySeaLevel(state.seaLevel - (exp ? expStep(state.seaLevel) * 5 : 5));
+  } else if (e.key === "Home") {
+    applySeaLevel(exp ? -8000 : SCI_MIN, true);
+  } else if (e.key === "End") {
+    applySeaLevel(exp ? 8000 : SCI_MAX, true);
+  } else if (e.key === "0") {
+    applySeaLevel(0, true);
+  } else if (e.key >= "1" && e.key <= "6") {
+    const p = PRESETS[parseInt(e.key, 10) - 1];
+    if (p) {
+      // presets always science — switch out of exp if needed
+      if (state.experimental) setExperimental(false);
+      applySeaLevel(p.sl, true);
+      ui.els.sceneDesc.textContent = p.desc;
+    }
+  }
 }
 
 function bindMapEvents() {
@@ -288,16 +364,11 @@ async function boot() {
   const app = document.getElementById("app");
   ui = buildUI(app, {
     onSeaLevel: (sl, fromPreset) => applySeaLevel(sl, fromPreset),
-    onStep: (d) => applySeaLevel(Math.round((state.seaLevel + d) * 10) / 10),
     onIce: applyIce,
+    onToggleExperimental: (on) => setExperimental(on),
     onToggleTheme: () => {
       state.theme = state.theme === "atlas" ? "dark" : "atlas";
-      ui.applyPanelState({
-        theme: state.theme,
-        statsOpen: state.statsOpen,
-        presetsOpen: state.presetsOpen,
-        layers: state.layers,
-      });
+      ui.applyPanelState(panelPrefs());
       persist();
       state.needRender = true;
     },
@@ -308,23 +379,13 @@ async function boot() {
     },
     onToggleStats: () => {
       state.statsOpen = !state.statsOpen;
-      ui.applyPanelState({
-        theme: state.theme,
-        statsOpen: state.statsOpen,
-        presetsOpen: state.presetsOpen,
-        layers: state.layers,
-      });
+      ui.applyPanelState(panelPrefs());
       persist();
       resizeCanvas();
     },
     onTogglePresets: () => {
       state.presetsOpen = !state.presetsOpen;
-      ui.applyPanelState({
-        theme: state.theme,
-        statsOpen: state.statsOpen,
-        presetsOpen: state.presetsOpen,
-        layers: state.layers,
-      });
+      ui.applyPanelState(panelPrefs());
       persist();
       resizeCanvas();
     },
@@ -333,13 +394,10 @@ async function boot() {
       persist();
       state.needRender = true;
     },
+    onKey: onKeyDown,
   });
-  ui.applyPanelState({
-    theme: state.theme,
-    statsOpen: state.statsOpen,
-    presetsOpen: state.presetsOpen,
-    layers: state.layers,
-  });
+  ui.applyPanelState(panelPrefs());
+  ui.applySliderRange(state.experimental);
 
   view = ui.els.map;
   resizeCanvas();
