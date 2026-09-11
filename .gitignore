@@ -21,3 +21,4 @@ venv/
 # data/elev.bin
 # data/elev.bin.gz
 .playwright-cli/
+_pref_cache/
