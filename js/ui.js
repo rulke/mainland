@@ -108,6 +108,7 @@ export function loadPrefs() {
     cities: true,
     china: true,
     continents: true,
+    natural: true,
     ghost: true,
   };
   try {
@@ -163,6 +164,7 @@ export function buildUI(root, handlers) {
           <label><input type="checkbox" data-layer="cities" checked /> 世界城市</label>
           <label><input type="checkbox" data-layer="china" checked /> 中国地级行政区</label>
           <label><input type="checkbox" data-layer="continents" checked /> 大陆名</label>
+          <label><input type="checkbox" data-layer="natural" checked /> 自然地名</label>
           <label><input type="checkbox" data-layer="ghost" checked /> 现代岸线</label>
         </div>
       </div>
@@ -242,11 +244,12 @@ export function buildUI(root, handlers) {
         <section>
           <h3>操作指南</h3>
           <ul>
-            <li>拖动底部<strong>海平面滑杆</strong>，或点击情景预设</li>
+            <li>拖动底部<strong>海平面滑杆</strong>，或点击情景预设；悬停滑杆可用<strong>滚轮</strong>调节（科学档默认 1 m，Shift 5 m，Ctrl 0.1 m）</li>
             <li>滚轮缩放、拖拽平移；经度可无限环绕</li>
-            <li>顶栏<strong>图层</strong>开关国家界线、国家名、世界城市、中国地级行政区、大陆名、现代岸线</li>
+            <li>顶栏<strong>图层</strong>开关国家界线、国家名、世界城市、中国地级行政区、大陆名、自然地名、现代岸线</li>
+            <li>中国地级名：5×–10× 仅省会/首府，≥10× 显示视口内全部</li>
             <li><strong>实验范围</strong>开启后滑杆变为 ±8000 m，步进随量级自适应（近零 10 m，最大 500 m）</li>
-            <li>侧栏可勾选冰盖贡献，自动写入海平面</li>
+            <li>侧栏勾选冰盖贡献会写入海平面；<strong>全部取消勾选则回到 +0.0 m</strong></li>
             <li>悬停地图查看坐标与高程/水深</li>
           </ul>
         </section>
@@ -262,7 +265,7 @@ export function buildUI(root, handlers) {
         </section>
         <section>
           <h3>数据来源与局限</h3>
-          <p>高程：ETOPO 2022 Bedrock（NOAA NCEI, DOI: 10.25921/fd45-gt74）。国界/城市：Natural Earth。中国地级行政区：公开行政区划边界（地级市/自治州/地区/盟，直辖市与港澳台为省级轮廓）。</p>
+          <p>高程：ETOPO 2022 Bedrock（NOAA NCEI, DOI: 10.25921/fd45-gt74）。国界/城市：Natural Earth。中国地级行政区：公开行政区划边界（地级市/自治州/地区/盟，直辖市与港澳台为省级轮廓）。自然地名：内置常用名（大洋/边缘海/主要山脉/大湖/主要山峰），非官方全量库。</p>
           <p>模型不含地壳均衡回弹（GIA）、冰盖压载与沉积。+60 m 为平衡态展示，不是时间预测。近岸城市尺度淹没请使用沿海高分辨率 DEM。</p>
         </section>
       </div>
@@ -351,6 +354,16 @@ export function buildUI(root, handlers) {
   els.sl.addEventListener("input", () => {
     handlers.onSeaLevel(parseFloat(els.sl.value));
   });
+  // mouse wheel on slider (science default 1 m; Shift 5; Ctrl 0.1; exp adaptive)
+  els.sl.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const dir = e.deltaY < 0 ? 1 : -1;
+      if (handlers.onWheelStep) handlers.onWheelStep(dir, e);
+    },
+    { passive: false }
+  );
   els.presets.addEventListener("click", (e) => {
     const b = e.target.closest(".preset");
     if (!b) return;

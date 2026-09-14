@@ -10,6 +10,74 @@ export const CONTINENTS = [
   { name: "南极洲", lon: 0, lat: -80 },
 ];
 
+/**
+ * 内置自然地名（常用名，非全量库）
+ * kind: ocean | sea | range | lake | peak
+ * minZoom: 开始显示的缩放
+ */
+export const NATURAL_LABELS = [
+  // 大洋
+  { name: "太平洋", lon: -150, lat: 0, kind: "ocean", minZoom: 1 },
+  { name: "大西洋", lon: -30, lat: 10, kind: "ocean", minZoom: 1 },
+  { name: "印度洋", lon: 80, lat: -20, kind: "ocean", minZoom: 1 },
+  { name: "北冰洋", lon: 0, lat: 80, kind: "ocean", minZoom: 1 },
+  { name: "南大洋", lon: 0, lat: -60, kind: "ocean", minZoom: 1 },
+  // 边缘海 / 海湾
+  { name: "地中海", lon: 18, lat: 36, kind: "sea", minZoom: 2.5 },
+  { name: "加勒比海", lon: -75, lat: 15, kind: "sea", minZoom: 2.5 },
+  { name: "孟加拉湾", lon: 88, lat: 15, kind: "sea", minZoom: 2.5 },
+  { name: "阿拉伯海", lon: 63, lat: 12, kind: "sea", minZoom: 2.5 },
+  { name: "南海", lon: 115, lat: 14, kind: "sea", minZoom: 2.5 },
+  { name: "东海", lon: 125, lat: 30, kind: "sea", minZoom: 3.5 },
+  { name: "黄海", lon: 123, lat: 35, kind: "sea", minZoom: 4 },
+  { name: "日本海", lon: 135, lat: 40, kind: "sea", minZoom: 3.5 },
+  { name: "鄂霍次克海", lon: 150, lat: 55, kind: "sea", minZoom: 3 },
+  { name: "白令海", lon: -175, lat: 58, kind: "sea", minZoom: 3 },
+  { name: "北海", lon: 3, lat: 56, kind: "sea", minZoom: 4 },
+  { name: "波罗的海", lon: 19, lat: 58, kind: "sea", minZoom: 4 },
+  { name: "黑海", lon: 34, lat: 43, kind: "sea", minZoom: 3.5 },
+  { name: "红海", lon: 38, lat: 20, kind: "sea", minZoom: 3 },
+  { name: "波斯湾", lon: 51, lat: 27, kind: "sea", minZoom: 3.5 },
+  { name: "墨西哥湾", lon: -90, lat: 25, kind: "sea", minZoom: 2.5 },
+  { name: "几内亚湾", lon: 0, lat: 3, kind: "sea", minZoom: 3 },
+  { name: "孟加拉湾", lon: 88, lat: 14, kind: "sea", minZoom: 2.5 },
+  { name: "珊瑚海", lon: 155, lat: -18, kind: "sea", minZoom: 3 },
+  { name: "塔斯曼海", lon: 160, lat: -38, kind: "sea", minZoom: 3.5 },
+  { name: "喜马拉雅山脉", lon: 85, lat: 29, kind: "range", minZoom: 3 },
+  { name: "落基山脉", lon: -110, lat: 45, kind: "range", minZoom: 3 },
+  { name: "安第斯山脉", lon: -70, lat: -20, kind: "range", minZoom: 3 },
+  { name: "阿尔卑斯山脉", lon: 10, lat: 46.5, kind: "range", minZoom: 4 },
+  { name: "乌拉尔山脉", lon: 60, lat: 60, kind: "range", minZoom: 3.5 },
+  { name: "昆仑山脉", lon: 85, lat: 36, kind: "range", minZoom: 3.5 },
+  { name: "秦岭", lon: 108, lat: 34, kind: "range", minZoom: 5 },
+  { name: "大高加索山脉", lon: 44, lat: 43, kind: "range", minZoom: 4 },
+  { name: "比利牛斯山脉", lon: 0, lat: 42.5, kind: "range", minZoom: 4.5 },
+  { name: "阿巴拉契亚山脉", lon: -80, lat: 38, kind: "range", minZoom: 4 },
+  { name: "大分水岭", lon: 146, lat: -30, kind: "range", minZoom: 3.5 },
+  { name: "斯堪的纳维亚山脉", lon: 12, lat: 63, kind: "range", minZoom: 4 },
+  { name: "天山山脉", lon: 82, lat: 42, kind: "range", minZoom: 3.5 },
+  { name: "祁连山", lon: 98, lat: 38, kind: "range", minZoom: 4.5 },
+  { name: "横断山脉", lon: 100, lat: 28, kind: "range", minZoom: 4.5 },
+  { name: "大兴安岭", lon: 122, lat: 50, kind: "range", minZoom: 4.5 },
+  { name: "太行山", lon: 113, lat: 37, kind: "range", minZoom: 5 },
+  // 湖泊
+  { name: "贝加尔湖", lon: 107, lat: 53.5, kind: "lake", minZoom: 4 },
+  { name: "苏必利尔湖", lon: -87, lat: 47.5, kind: "lake", minZoom: 4 },
+  { name: "维多利亚湖", lon: 33, lat: -1, kind: "lake", minZoom: 4 },
+  { name: "里海", lon: 51, lat: 41, kind: "lake", minZoom: 3.5 },
+  { name: "青海湖", lon: 100, lat: 37, kind: "lake", minZoom: 5 },
+  { name: "咸海", lon: 59, lat: 45, kind: "lake", minZoom: 4.5 },
+  { name: "的的喀喀湖", lon: -69, lat: -16, kind: "lake", minZoom: 4.5 },
+  { name: "巴尔喀什湖", lon: 74, lat: 46, kind: "lake", minZoom: 4.5 },
+  // 山峰
+  { name: "珠穆朗玛峰", lon: 86.925, lat: 27.988, kind: "peak", minZoom: 5 },
+  { name: "乔戈里峰", lon: 76.513, lat: 35.88, kind: "peak", minZoom: 5.5 },
+  { name: "乞力马扎罗山", lon: 37.35, lat: -3.07, kind: "peak", minZoom: 5 },
+  { name: "阿空加瓜山", lon: -68.5, lat: -32.65, kind: "peak", minZoom: 5 },
+  { name: "麦金利山", lon: -151.0, lat: 63.07, kind: "peak", minZoom: 5 },
+  { name: "厄尔布鲁士山", lon: 42.44, lat: 43.35, kind: "peak", minZoom: 5.5 },
+];
+
 const COUNTRY_LABEL_ZH = {
   China: "中国",
   Russia: "俄罗斯",
@@ -362,6 +430,65 @@ export function drawOverlays(ctx, layers, t, opts) {
       if (!inView(x, y, vw, vh, 80)) continue;
       ctx.fillText(c.name, x, y);
     }
+    ctx.restore();
+  }
+
+  // 自然地名：海洋 / 海湾 / 山脉 / 湖泊 / 山峰
+  if (opts.showNatural) {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const item of NATURAL_LABELS) {
+      if (zoom < item.minZoom) continue;
+      const { x, y } = projectView(item.lon, item.lat);
+      if (!inView(x, y, vw, vh, 20)) continue;
+      const isWater = item.kind === "ocean" || item.kind === "sea" || item.kind === "lake";
+      const isPeak = item.kind === "peak";
+      let font;
+      let alpha = 1;
+      if (item.kind === "ocean") {
+        font = `600 ${Math.round(14 + Math.min(zoom, 3))}px "Segoe UI", "PingFang SC", sans-serif`;
+        alpha = zoom <= 2 ? 0.55 : 0.4;
+      } else if (item.kind === "sea") {
+        font = `500 ${Math.round(11 + Math.min(zoom, 2))}px "Segoe UI", "PingFang SC", sans-serif`;
+        alpha = 0.55;
+      } else if (item.kind === "range") {
+        font = `italic 600 ${Math.round(11 + Math.min(zoom, 2))}px "Segoe UI", "PingFang SC", sans-serif`;
+        alpha = zoom >= 6 ? 0.45 : 0.65;
+      } else if (item.kind === "lake") {
+        font = `500 ${Math.round(10 + Math.min(zoom, 2))}px "Segoe UI", "PingFang SC", sans-serif`;
+        alpha = 0.6;
+      } else {
+        font = `500 10px "Segoe UI", "PingFang SC", sans-serif`;
+        alpha = 0.75;
+      }
+      ctx.globalAlpha = alpha;
+      ctx.font = font;
+      // water: lighter on dark, darker blue on light; range: ink
+      if (isWater) {
+        ctx.fillStyle = theme === "atlas" ? "rgba(14, 90, 130, 0.9)" : "rgba(160, 210, 240, 0.95)";
+        ctx.strokeStyle = theme === "atlas" ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.35)";
+      } else {
+        ctx.fillStyle = theme === "atlas" ? "rgba(60, 45, 30, 0.9)" : "rgba(235, 220, 190, 0.95)";
+        ctx.strokeStyle = theme === "atlas" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)";
+      }
+      ctx.lineWidth = 2;
+      if (isPeak) {
+        // small triangle + name
+        ctx.beginPath();
+        ctx.moveTo(x, y - 4);
+        ctx.lineTo(x + 4, y + 3);
+        ctx.lineTo(x - 4, y + 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeText(item.name, x + 8, y);
+        ctx.fillText(item.name, x + 8, y);
+      } else {
+        ctx.strokeText(item.name, x, y);
+        ctx.fillText(item.name, x, y);
+      }
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 }

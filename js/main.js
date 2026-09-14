@@ -165,6 +165,7 @@ function paint() {
     showChina: state.layers.china,
     showContinents: state.layers.continents,
     showCountryNames: state.layers.countryNames,
+    showNatural: state.layers.natural !== false,
   });
   drawMinimapOverlay();
 
@@ -205,7 +206,13 @@ function applyIce(keys) {
     sum += ICE[k].m;
   }
   ui.setIceSum(sum);
-  if (keys.length) applySeaLevel(Math.round(sum * 10) / 10, true);
+  if (keys.length) {
+    applySeaLevel(Math.round(sum * 10) / 10, true);
+  } else {
+    // all unchecked → back to modern
+    if (state.experimental) setExperimental(false);
+    applySeaLevel(0, true);
+  }
 }
 
 function setExperimental(on) {
@@ -366,6 +373,13 @@ async function boot() {
     onSeaLevel: (sl, fromPreset) => applySeaLevel(sl, fromPreset),
     onIce: applyIce,
     onToggleExperimental: (on) => setExperimental(on),
+    onWheelStep: (dir, e) => {
+      const exp = state.experimental;
+      let step = exp ? expStep(state.seaLevel) : 1;
+      if (e.shiftKey) step = exp ? step * 5 : 5;
+      else if (e.ctrlKey || e.metaKey) step = exp ? step / 10 : 0.1;
+      applySeaLevel(Math.round((state.seaLevel + dir * step) * 10) / 10);
+    },
     onToggleTheme: () => {
       state.theme = state.theme === "atlas" ? "dark" : "atlas";
       ui.applyPanelState(panelPrefs());
