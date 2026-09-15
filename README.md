@@ -10,7 +10,6 @@
 
 **GitHub Pages：** [https://rulke.github.io/mainland/](https://rulke.github.io/mainland/)
 
-> 首次开启 Pages 后需等待 1–2 分钟部署完成。若 404，请在仓库 **Settings → Pages** 确认分支为 `main`、目录为 `/ (root)`。
 
 ---
 
