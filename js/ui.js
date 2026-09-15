@@ -171,6 +171,7 @@ export function buildUI(root, handlers) {
       <button type="button" class="btn" id="btn-theme">深色</button>
       <button type="button" class="btn" id="btn-cb" title="色盲友好">色盲</button>
       <button type="button" class="btn" id="btn-help" aria-haspopup="dialog">关于与指南</button>
+      <a class="btn btn-link" href="https://github.com/rulke/mainland/tree/main" target="_blank" rel="noopener noreferrer" title="在 GitHub 上查看项目">GitHub</a>
       <button type="button" class="btn btn-icon" id="btn-stats" title="统计面板">»</button>
     </div>
   </header>
@@ -267,6 +268,9 @@ export function buildUI(root, handlers) {
           <h3>数据来源与局限</h3>
           <p>高程：ETOPO 2022 Bedrock（NOAA NCEI, DOI: 10.25921/fd45-gt74）。国界/城市：Natural Earth。中国地级行政区：公开行政区划边界（地级市/自治州/地区/盟，直辖市与港澳台为省级轮廓）。自然地名：内置常用名（大洋/边缘海/主要山脉/大湖/主要山峰），非官方全量库。</p>
           <p>模型不含地壳均衡回弹（GIA）、冰盖压载与沉积。+60 m 为平衡态展示，不是时间预测。近岸城市尺度淹没请使用沿海高分辨率 DEM。</p>
+          <p>源码与问题反馈：
+            <a href="https://github.com/rulke/mainland/tree/main" target="_blank" rel="noopener noreferrer">github.com/rulke/mainland</a>
+          </p>
         </section>
       </div>
     </div>

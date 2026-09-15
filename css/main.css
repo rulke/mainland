@@ -155,6 +155,18 @@ input {
   background: transparent;
 }
 
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+.btn-link:hover {
+  color: var(--accent-cyan);
+  text-decoration: none;
+}
+
 .stats.is-collapsed {
   display: none;
 }

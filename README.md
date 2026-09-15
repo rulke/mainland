@@ -74,17 +74,6 @@ $envPy = "$env:USERPROFILE\AppData\Local\miniconda3\envs\mainland-slr\Scripts\py
 
 ---
 
-## 部署到 GitHub Pages
-
-1. 将本仓库推送至 GitHub（见下方「托管」）。
-2. 打开仓库 **Settings → Pages**。
-3. **Build and deployment**：Source 选 `Deploy from a branch`；Branch 选 `main` / `/ (root)`。
-4. 保存后等待部署，访问：`https://rulke.github.io/mainland/`
-
-静态资源均为**相对路径**，可部署到任意静态托管（Nginx、对象存储等）。缓存与 Nginx 示例见 `DESIGN.md` §9。
-
----
-
 ## 数据重建（可选）
 
 修改 DEM 或分辨率时：
@@ -132,6 +121,5 @@ mainland/
 
 ---
 
-## License
 
-以 GitHub 仓库中已选择的许可证为准；使用 ETOPO / Natural Earth / 行政区划数据时请同时遵守各数据源的署名与使用条款。
+
