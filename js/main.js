@@ -177,7 +177,10 @@ function paint() {
   const badge = ui.els.zoomBadge;
   if (state.zoom > 4) {
     badge.hidden = false;
-    badge.textContent = `缩放 ${state.zoom.toFixed(1)}× · 原始网格 ≈ 2 km`;
+    badge.textContent =
+      state.zoom > 12
+        ? `缩放 ${state.zoom.toFixed(1)}× · 原始网格 ≈ 2 km（纯放大）`
+        : `缩放 ${state.zoom.toFixed(1)}× · 原始网格 ≈ 2 km`;
   } else {
     badge.hidden = true;
   }
@@ -294,7 +297,7 @@ function bindMapEvents() {
     (e) => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
-      state.zoom = Math.min(12, Math.max(1, state.zoom * factor));
+      state.zoom = Math.min(18, Math.max(1, state.zoom * factor));
       clampPan();
       state.needRender = true;
     },
@@ -358,7 +361,7 @@ function bindMapEvents() {
   });
   el.addEventListener("dblclick", (e) => {
     if (e.shiftKey) state.zoom = Math.max(1, state.zoom / 1.5);
-    else state.zoom = Math.min(12, state.zoom * 1.5);
+    else state.zoom = Math.min(18, state.zoom * 1.5);
     clampPan();
     state.needRender = true;
   });
