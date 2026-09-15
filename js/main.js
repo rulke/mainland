@@ -107,21 +107,25 @@ function resizeCanvas() {
   view.style.height = h + "px";
   view.width = Math.max(1, Math.floor(w * dpr));
   view.height = Math.max(1, Math.floor(h * dpr));
+  if (state.meta) clampPan();
   state.needRender = true;
 }
 
 function clampPan() {
   const { meta, zoom } = state;
+  if (!meta) return;
   const W = meta.width;
   const H = meta.height;
+  // longitude: infinite wrap
   state.cx = ((state.cx % W) + W) % W;
+  // latitude: zero overscroll — map edge always covers the viewport
   const s = (view.height / H) * zoom;
   const viewH = view.height / s;
   if (viewH >= H) {
     state.cy = H / 2;
   } else {
-    const over = viewH * 0.1;
-    state.cy = Math.max(-over, Math.min(H - viewH + over, state.cy));
+    const half = viewH / 2;
+    state.cy = Math.max(half, Math.min(H - half, state.cy));
   }
 }
 
@@ -148,6 +152,7 @@ function drawMinimapOverlay() {
 
 function paint() {
   if (!renderer || !state.elev) return;
+  clampPan();
   renderer.render(state.seaLevel, {
     colorblind: state.colorblind,
     showGhost: state.layers.ghost,
@@ -228,6 +233,25 @@ function setExperimental(on) {
   }
 }
 
+/**
+ * Increment SL by one `step` in `dir` (±1).
+ * Experimental: snap to the *same* step grid (avoids 200→500 trap at ±2000).
+ * Science: allow magnet snap via applySeaLevel.
+ */
+function nudgeSeaLevel(dir, step) {
+  const exp = state.experimental;
+  let next = state.seaLevel + dir * step;
+  if (exp) {
+    // align to this wheel/key step, then clamp — do not re-snap with expStep(next)
+    const s = step > 0 ? step : expStep(state.seaLevel);
+    next = Math.round(next / s) * s;
+    next = clampSeaLevel(next, true);
+    applySeaLevel(next, true);
+  } else {
+    applySeaLevel(Math.round(next * 10) / 10, false);
+  }
+}
+
 function onKeyDown(e) {
   const exp = state.experimental;
   let step = exp ? expStep(state.seaLevel) : 0.1;
@@ -236,16 +260,16 @@ function onKeyDown(e) {
 
   if (e.key === "ArrowLeft") {
     e.preventDefault();
-    applySeaLevel(Math.round((state.seaLevel - step) * 10) / 10);
+    nudgeSeaLevel(-1, step);
   } else if (e.key === "ArrowRight") {
     e.preventDefault();
-    applySeaLevel(Math.round((state.seaLevel + step) * 10) / 10);
+    nudgeSeaLevel(1, step);
   } else if (e.key === "PageUp") {
     e.preventDefault();
-    applySeaLevel(state.seaLevel + (exp ? expStep(state.seaLevel) * 5 : 5));
+    nudgeSeaLevel(1, exp ? expStep(state.seaLevel) * 5 : 5);
   } else if (e.key === "PageDown") {
     e.preventDefault();
-    applySeaLevel(state.seaLevel - (exp ? expStep(state.seaLevel) * 5 : 5));
+    nudgeSeaLevel(-1, exp ? expStep(state.seaLevel) * 5 : 5);
   } else if (e.key === "Home") {
     applySeaLevel(exp ? -8000 : SCI_MIN, true);
   } else if (e.key === "End") {
@@ -378,7 +402,7 @@ async function boot() {
       let step = exp ? expStep(state.seaLevel) : 1;
       if (e.shiftKey) step = exp ? step * 5 : 5;
       else if (e.ctrlKey || e.metaKey) step = exp ? step / 10 : 0.1;
-      applySeaLevel(Math.round((state.seaLevel + dir * step) * 10) / 10);
+      nudgeSeaLevel(dir, step);
     },
     onToggleTheme: () => {
       state.theme = state.theme === "atlas" ? "dark" : "atlas";
