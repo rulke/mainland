@@ -1,48 +1,137 @@
 # 海陆变迁
 
-拖动海平面（−150 ~ +80 m），实时查看全球陆地/海洋边界变化。可叠加国家界线、世界城市、中国行政区与大陆名。数据源：ETOPO 2022 Bedrock。
+**交互式全球海平面—大陆形态可视化**
 
-## 本地运行（必须 HTTP）
+基于 NOAA **ETOPO 2022 Bedrock** 全球高程数据，以一阶近似模型实时呈现：海平面升降时，陆地与海洋边界如何变化。海退时大陆架以金色标出「新生陆地」，海升时原低地以灰青色标出「新淹没」。
 
-```powershell
-$envPy = "$env:USERPROFILE\AppData\Local\miniconda3\envs\mainland-slr\Scripts\python.exe"
-& $envPy scripts/serve.py 8080
-# 浏览器打开 http://127.0.0.1:8080/
-```
+---
 
-请用 `scripts/serve.py`（正确声明 `application/javascript`）。Windows 上 `python -m http.server` 可能把 `.js` 标成 `text/plain`，导致 ES Module 无法加载。
+## 在线访问
 
-## 服务器部署
+**GitHub Pages：** [https://rulke.github.io/mainland/](https://rulke.github.io/mainland/)
 
-上传 `index.html`、`css/`、`js/`、`data/` 即可。纯静态，无后端。
+> 首次开启 Pages 后需等待 1–2 分钟部署完成。若 404，请在仓库 **Settings → Pages** 确认分支为 `main`、目录为 `/ (root)`。
 
-Nginx 示例见 `DESIGN.md` §9。要点：
+---
 
-- 相对路径
-- `elev.bin` / 静态资源长缓存
-- 可选 `gzip_static`（已有 `elev.bin.gz`）
+## 功能概览
 
-## 数据重建
+| 模块 | 说明 |
+|---|---|
+| 海平面 | 科学档 **−150 ～ +80 m**，步进 **0.1 m**；实验档 **±8000 m**（步进自适应 10→500 m） |
+| 设色 | 海图式水深色带 + hypsometric 陆地；签名层「金色新生陆地」 |
+| 情景 | 末次冰盛期 / 冰消中期 / 现代 / AR6 高排放 2100 / 高端 +2 m / 冰盖全融 +60 m |
+| 冰盖 | 格陵兰、WAIS、EAIS、山地冰川勾选合计；**全部取消回到 +0.0 m** |
+| 图层 | 国家界线、国家名、世界城市、中国地级行政区（333）、大陆名、自然地名、现代岸线 |
+| 地图 | 等距圆柱；缩放 **1×–18×**；经度无限环绕；纬度零过冲钳制 |
+| 统计 | 维度加权陆地面积 % 与相对现代变化 |
+| 注记 | 白令陆桥、巽他古陆、多格兰等随海平面条件显隐 |
+| 主题 | **浅色默认** / 深色切换 |
 
-```powershell
-conda activate mainland-slr   # 或上述 env 路径
-python scripts/download_etopo.py
-python scripts/process_etopo.py
-```
+---
 
 ## 操作
 
 | 操作 | 说明 |
 |---|---|
-| 滑杆 | 海平面，步进 0.1 m；悬停滚轮 1 m（Shift 5 / Ctrl 0.1） |
-| 滚轮 / 拖拽 | 地图缩放 / 平移 |
-| 1–6 | 预设情景 |
-| ← → | ±0.1 m；Shift ±1 m |
-| 0 | 回到现代 |
-| 右侧 | 陆地面积、冰盖开关（全部取消回到 0）、注记 |
-| 图层 | 国家/国家名/城市/中国地级/大陆名/自然地名/岸线 |
-| 实验范围 | ±8000 m，步进自适应 |
+| 海平面滑杆 | 步进 0.1 m；悬停**滚轮** ±1 m（Shift 5 m，Ctrl 0.1 m） |
+| 实验范围 | 勾选后滑杆变为 ±8000 m |
+| 地图 | 滚轮缩放、拖拽平移；双击放大，Shift+双击缩小 |
+| 图层 | 顶栏「图层」开关 |
+| 情景钉 / 预设 | 滑杆下彩色圆点或底部按钮 |
+| 快捷键 | `←` `→` 0.1 m；`Shift` 1 m；`0` 现代；`1`–`6` 预设；`Home`/`End` 两端 |
+| 帮助 | 顶栏 **「关于与指南」**（产品介绍、操作、快捷键、数据来源） |
 
-## 科学局限
+中国地级名显示规则：缩放 **&lt;5×** 不标名；**5×–10×** 仅省会/首府；**≥10×** 视口内地级行政区全量。
 
-一阶近似：固定固体表面 + 海平面切割。无 GIA、无冰盖压载。+60 m 为平衡态展示，非时间预测。
+---
+
+## 技术架构
+
+- **纯静态**：HTML + CSS + 原生 ES Module，无构建、无 npm、无后端
+- **高程栅格**：`data/elev.bin` — 4320×2160，Int16 小端，约 1 角分（~2 km）
+- **渲染**：Canvas 2D；Color LUT；叠加矢量 GeoJSON（国界/城市/行政区）
+- **环境**：本地预处理使用 conda 环境 `mainland-slr`（Python 3.12 + numpy + Pillow）
+
+---
+
+## 本地运行
+
+需通过 **HTTP** 访问（不要用 `file://` 打开）。
+
+```powershell
+# 解释器（本机 conda 环境；亦可 python3 + numpy/Pillow）
+$envPy = "$env:USERPROFILE\AppData\Local\miniconda3\envs\mainland-slr\Scripts\python.exe"
+
+# 启动（会正确返回 application/javascript）
+& $envPy scripts/serve.py 8080
+
+# 浏览器打开
+# http://127.0.0.1:8080/
+```
+
+请使用 `scripts/serve.py`。在 Windows 上直接 `python -m http.server` 可能把 `.js` 标成 `text/plain`，导致 ES Module 无法加载。
+
+---
+
+## 部署到 GitHub Pages
+
+1. 将本仓库推送至 GitHub（见下方「托管」）。
+2. 打开仓库 **Settings → Pages**。
+3. **Build and deployment**：Source 选 `Deploy from a branch`；Branch 选 `main` / `/ (root)`。
+4. 保存后等待部署，访问：`https://rulke.github.io/mainland/`
+
+静态资源均为**相对路径**，可部署到任意静态托管（Nginx、对象存储等）。缓存与 Nginx 示例见 `DESIGN.md` §9。
+
+---
+
+## 数据重建（可选）
+
+修改 DEM 或分辨率时：
+
+```powershell
+conda activate mainland-slr
+python scripts/download_etopo.py      # → raw/（不入库）
+python scripts/process_etopo.py       # → data/elev.bin 等
+python scripts/download_china_cities.py  # 中国地级行政区 GeoJSON
+```
+
+---
+
+## 数据来源与科学局限
+
+| 来源 | 用途 |
+|---|---|
+| [ETOPO 2022 Bedrock](https://www.ncei.noaa.gov/products/etopo-global-relief-model)（NOAA NCEI, [DOI: 10.25921/fd45-gt74](https://doi.org/10.25921/fd45-gt74)） | 全球高程/水深 |
+| Natural Earth | 国家界线、世界主要城市 |
+| 公开行政区划边界 | 中国地级行政区（地级市/自治州/地区/盟；直辖市与港澳台为省级轮廓） |
+| 内置常用名 | 大洋、边缘海、主要山脉、大湖、主要山峰（非官方全量库） |
+
+**模型局限（页面「关于与指南」亦有说明）：**
+
+1. 一阶近似：固定固体表面 + 水平面切割；无地壳均衡回弹（GIA）、无冰盖压载、无沉积。
+2. **+60 m** 为冰盖全融**平衡态展示**，不是某一年的时间预测。
+3. 地图上的格陵兰/南极为 **Bedrock 基岩**，不是冰体本身。
+4. 近岸城市尺度淹没需沿海高分辨率 DEM；本工具服务**大陆尺度**。
+5. **实验档 ±8000 m** 仅供形态探索，地球无对应自然海平面情景。
+
+---
+
+## 仓库结构
+
+```
+mainland/
+├── index.html          # 入口
+├── css/main.css
+├── js/                 # 模块：渲染、图层、UI、主逻辑
+├── data/               # elev.bin、geo GeoJSON、meta、预览图
+├── scripts/            # 下载/预处理/本地 HTTP
+├── AGENTS.md           # 工程约定
+└── DESIGN.md           # 设计与交互规格（真源）
+```
+
+---
+
+## License
+
+以 GitHub 仓库中已选择的许可证为准；使用 ETOPO / Natural Earth / 行政区划数据时请同时遵守各数据源的署名与使用条款。

@@ -66,20 +66,21 @@ $envPy = "$env:USERPROFILE\AppData\Local\miniconda3\envs\mainland-slr\Scripts\py
 ## 技术约束（锁死）
 
 1. 投影：等距圆柱（Equirectangular），不用墨卡托。
-2. 海平面范围：**−150.0 ~ +80.0 m**。无实验扩展档。
-3. 最小步进：**0.1 m**。显示 1 位小数；负号用 `−`（U+2212）。
+2. 海平面范围：科学档 **−150.0 ~ +80.0 m**，最小步进 **0.1 m**；可选实验档 **±8000 m**（步进自适应）。
+3. 显示 1 位小数；负号用 `−`（U+2212）。
 4. 高程数据：ETOPO 2022 **Bedrock**（不是 Ice Surface）。
 5. 交付栅格：**4320 × 2160**，Int16 小端，单位米。
 6. 陆地面积：纬度加权 `w = cos(lat)`，文案写「纬度加权」。
-7. 主题：深色默认；纸色图集可切换。
+7. 主题：**浅色默认**；深色可切换。
 8. 签名视觉：海退时大陆架「金色新生陆地」。
-9. 部署：纯静态，任意 HTTP 服务器；验收以 HTTP 打开为准。
+9. 部署：纯静态；GitHub Pages：`https://rulke.github.io/mainland/`（`main` / root）。
+10. 本地验收用 `scripts/serve.py`，不要 `python -m http.server`。
 
 细节以 `DESIGN.md` 为准；两文件冲突时 **改 DESIGN.md 先，再改代码**。
 
 ## 验证清单（改完必须跑）
 
-- [ ] `python -m http.server 8080` 打开页面无控制台报错
+- [ ] `scripts/serve.py 8080` 打开页面无控制台报错
 - [ ] 滑杆可拖到 −130 / 0 / +60，读数步进 0.1 m
 - [ ] 滑杆悬停滚轮：科学档 ±1 m
 - [ ] 冰盖全勾后取消全部 → 海平面回到 +0.0 m
