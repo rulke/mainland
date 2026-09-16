@@ -2,7 +2,7 @@ import { landRamp, seaRamp, goldRamp, FLOOD_RGB, CB } from "./color-ramps.js";
 
 /**
  * Full-resolution color map renderer.
- * Writes ImageData for the DEM grid; caller scales via canvas.
+ * Colorize once per sea-level/theme change; pan/zoom only blits the cache.
  */
 export class MapRenderer {
   constructor(elev, width, height) {
@@ -12,12 +12,14 @@ export class MapRenderer {
     this.off = document.createElement("canvas");
     this.off.width = width;
     this.off.height = height;
-    this.ctx = this.off.getContext("2d", { willReadFrequently: true });
+    // write once + drawImage many times → do NOT use willReadFrequently
+    this.ctx = this.off.getContext("2d");
     this.image = this.ctx.createImageData(width, height);
     this.ghost = this.buildGhostCoast();
+    this._key = null;
+    this._ready = false;
   }
 
-  /** Precompute modern coastline (elev crosses 0) as a mask. */
   buildGhostCoast() {
     const { elev, w, h } = this;
     const mask = new Uint8Array(w * h);
@@ -39,13 +41,23 @@ export class MapRenderer {
     return mask;
   }
 
-  render(seaLevel, opts = {}) {
+  /** Re-colorize only when inputs change. Returns true if raster was redone. */
+  ensureRaster(seaLevel, opts = {}) {
     const {
       colorblind = false,
       showGhost = true,
       ghostAlpha = 0.35,
       theme = "atlas",
     } = opts;
+    const key = `${seaLevel}|${colorblind}|${showGhost}|${ghostAlpha}|${theme}`;
+    if (this._ready && this._key === key) return false;
+    this._rasterize(seaLevel, { colorblind, showGhost, ghostAlpha, theme });
+    this._key = key;
+    this._ready = true;
+    return true;
+  }
+
+  _rasterize(seaLevel, { colorblind, showGhost, ghostAlpha, theme }) {
     const { elev, w, h, image, ghost } = this;
     const data = image.data;
     const sl = seaLevel;
@@ -58,13 +70,12 @@ export class MapRenderer {
       const e = elev[p];
       let r, g, b;
       if (e < sl) {
-        const depth = sl - e;
         if (sl > 0 && e >= 0) {
           r = flood[0];
           g = flood[1];
           b = flood[2];
         } else {
-          seaFn(depth, rgb);
+          seaFn(sl - e, rgb);
           r = rgb[0];
           g = rgb[1];
           b = rgb[2];
@@ -88,7 +99,6 @@ export class MapRenderer {
     }
 
     if (showGhost) {
-      // light theme: darken; dark theme: lighten
       const lighten = theme !== "atlas";
       const a = Math.round(255 * ghostAlpha);
       for (let p = 0, n = w * h; p < n; p++) {
@@ -107,10 +117,9 @@ export class MapRenderer {
     }
 
     this.ctx.putImageData(image, 0, 0);
-    return this.off;
   }
 
-  /** Draw offscreen DEM onto a view canvas with zoom/pan + lon wrap. */
+  /** Draw cached DEM onto view with zoom/pan + lon wrap. */
   drawTo(view, zoom, cx, cy, smooth, bg = "#0B1220") {
     const ctx = view.getContext("2d");
     const vw = view.width;
@@ -122,19 +131,12 @@ export class MapRenderer {
     const s = baseScale * zoom;
     const dw = this.w * s;
     const dh = this.h * s;
-    // wrap cx into [0, w)
     const wx = ((cx % this.w) + this.w) % this.w;
     const dx = vw / 2 - wx * s;
     const dy = vh / 2 - cy * s;
-    // draw copies so horizontal wrap has no black gap
     ctx.drawImage(this.off, dx, dy, dw, dh);
     if (dx > 0) ctx.drawImage(this.off, dx - dw, dy, dw, dh);
     if (dx + dw < vw) ctx.drawImage(this.off, dx + dw, dy, dw, dh);
-    // edge fade into void (soft, not hard black)
-    const gradL = ctx.createLinearGradient(0, 0, Math.min(80, vw * 0.06), 0);
-    gradL.addColorStop(0, bg);
-    gradL.addColorStop(1, "rgba(0,0,0,0)");
-    // only if world doesn't fully cover — at high zoom cover always true
     return { s, dx, dy, dw, dh, wx };
   }
 }

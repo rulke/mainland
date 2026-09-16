@@ -153,7 +153,8 @@ function drawMinimapOverlay() {
 function paint() {
   if (!renderer || !state.elev) return;
   clampPan();
-  renderer.render(state.seaLevel, {
+  // colorize only when sea level / theme / ghost / colorblind change
+  const rasterChanged = renderer.ensureRaster(state.seaLevel, {
     colorblind: state.colorblind,
     showGhost: state.layers.ghost,
     theme: state.theme,
@@ -161,6 +162,8 @@ function paint() {
   const smooth = state.zoom <= 4;
   const t = renderer.drawTo(view, state.zoom, state.cx, state.cy, smooth, bgForTheme());
   const ctx = view.getContext("2d");
+  // drawOverlays uses setTransform + restore; ensure identity for any later 2d work
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawOverlays(ctx, state.geo, t, {
     gridW: state.meta.width,
     gridH: state.meta.height,
@@ -172,7 +175,11 @@ function paint() {
     showCountryNames: state.layers.countryNames,
     showNatural: state.layers.natural !== false,
   });
-  drawMinimapOverlay();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // minimap is cheap; skip while dragging for extra smoothness
+  if (!state.dragging || rasterChanged) drawMinimapOverlay();
+  else if (state._miniFrame == null || state._miniFrame % 8 === 0) drawMinimapOverlay();
+  state._miniFrame = (state._miniFrame || 0) + 1;
 
   const badge = ui.els.zoomBadge;
   if (state.zoom > 4) {
@@ -200,11 +207,27 @@ function applySeaLevel(sl, fromPreset) {
   if (!state.experimental) {
     state.lastScienceLevel = state.seaLevel;
   }
-  const pct = state.landPctFn(state.seaLevel);
+  // show last known % immediately; refresh % in a coalesced timer (O(grid))
+  const pct = state._lastLandPct ?? state.landBase ?? 0;
   ui.setSeaLevelUI(state.seaLevel, pct, state.landBase, state.experimental);
   ui.setAnnotations(activeAnnotations());
+  scheduleLandPctUpdate();
   state.needRender = true;
 }
+
+function scheduleLandPctUpdate() {
+  if (state._landTimer) clearTimeout(state._landTimer);
+  state._landTimer = setTimeout(() => {
+    state._landTimer = 0;
+    if (!state.landPctFn) return;
+    const pct = state.landPctFn(state.seaLevel);
+    state._lastLandPct = pct;
+    ui.setSeaLevelUI(state.seaLevel, pct, state.landBase, state.experimental);
+  }, 60);
+}
+
+// throttle land-fraction while dragging the slider (not map drag)
+let _landPctTimer = 0;
 
 function applyIce(keys) {
   state.ice = { gis: false, wais: false, eais: false, glacier: false };

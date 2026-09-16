@@ -234,6 +234,52 @@ function inView(x, y, w, h, pad = 20) {
   return x > -pad && y > -pad && x < w + pad && y < h + pad;
 }
 
+/** Path2D caches in world-grid space (avoid rebuilding every pan frame). */
+const _pathCache = {
+  countries: null,
+  countriesSig: "",
+  china: null,
+  chinaSig: "",
+};
+
+function gridPathFromFeatures(features, skipFn, W, H) {
+  const path = new Path2D();
+  for (const f of features) {
+    if (skipFn && skipFn(f.properties)) continue;
+    eachRing(f.geometry, (ring) => {
+      for (let i = 0; i < ring.length; i++) {
+        const [lon, lat] = ring[i];
+        const x = ((lon + 180) / 360) * W;
+        const y = ((90 - lat) / 180) * H;
+        if (i === 0) path.moveTo(x, y);
+        else path.lineTo(x, y);
+      }
+      path.closePath();
+    });
+  }
+  return path;
+}
+
+function getCountriesPath(features, W, H) {
+  const sig = `${features.length}:${W}x${H}`;
+  if (_pathCache.countries && _pathCache.countriesSig === sig) {
+    return _pathCache.countries;
+  }
+  _pathCache.countries = gridPathFromFeatures(features, skipSeparateChinaSAR, W, H);
+  _pathCache.countriesSig = sig;
+  return _pathCache.countries;
+}
+
+function getChinaPath(features, W, H) {
+  const sig = `${features.length}:${W}x${H}`;
+  if (_pathCache.china && _pathCache.chinaSig === sig) {
+    return _pathCache.china;
+  }
+  _pathCache.china = gridPathFromFeatures(features, null, W, H);
+  _pathCache.chinaSig = sig;
+  return _pathCache.china;
+}
+
 export function drawOverlays(ctx, layers, t, opts) {
   const { s, dx, dy } = t;
   const W = opts.gridW;
@@ -248,25 +294,14 @@ export function drawOverlays(ctx, layers, t, opts) {
     return { x: dx + p.x * s, y: dy + p.y * s };
   };
 
-  if (layers.countries?.features) {
+  if (layers.countries?.features?.length) {
+    const path = getCountriesPath(layers.countries.features, W, H);
     ctx.save();
-    ctx.lineWidth = zoom > 4 ? 1.25 : 0.7;
+    ctx.setTransform(s, 0, 0, s, dx, dy);
+    ctx.lineWidth = (zoom > 4 ? 1.25 : 0.7) / s;
     ctx.strokeStyle =
       theme === "atlas" ? "rgba(30, 40, 55, 0.45)" : "rgba(232, 238, 247, 0.35)";
-    ctx.beginPath();
-    for (const f of layers.countries.features) {
-      if (skipSeparateChinaSAR(f.properties)) continue;
-      eachRing(f.geometry, (ring) => {
-        for (let i = 0; i < ring.length; i++) {
-          const [lon, lat] = ring[i];
-          const { x, y } = projectView(lon, lat);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-      });
-    }
-    ctx.stroke();
+    ctx.stroke(path);
     ctx.restore();
   }
 
@@ -274,24 +309,15 @@ export function drawOverlays(ctx, layers, t, opts) {
     const src = layers.prefectures?.features?.length
       ? layers.prefectures
       : layers.chinaProv;
-    if (src?.features) {
+    if (src?.features?.length) {
+      const path = getChinaPath(src.features, W, H);
       ctx.save();
-      ctx.lineWidth = zoom > 4 ? 1 : 0.6;
+      ctx.setTransform(s, 0, 0, s, dx, dy);
+      ctx.lineWidth = (zoom > 4 ? 1 : 0.6) / s;
       ctx.strokeStyle =
         theme === "atlas" ? "rgba(180, 80, 40, 0.55)" : "rgba(232, 184, 74, 0.45)";
-      ctx.beginPath();
-      for (const f of src.features) {
-        eachRing(f.geometry, (ring) => {
-          for (let i = 0; i < ring.length; i++) {
-            const [lon, lat] = ring[i];
-            const { x, y } = projectView(lon, lat);
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.closePath();
-        });
-      }
-      ctx.stroke();
+      ctx.stroke(path);
+      ctx.restore();
 
       // labels: <5 none · 5–10 capitals · ≥10 all in viewport
       if (zoom >= 5) {
