@@ -79,7 +79,7 @@ export const NATURAL_LABELS = [
 ];
 
 const COUNTRY_LABEL_ZH = {
-  China: "中国",
+  China: "中华人民共和国",
   Russia: "俄罗斯",
   "United States of America": "美国",
   Canada: "加拿大",
@@ -210,6 +210,19 @@ function eachRing(geom, fn) {
   }
 }
 
+/**
+ * Natural Earth 将台湾标成独立主权要素。
+ * 产品约定：台港澳仅通过「中国行政区」层展示，国家层不单独描边/标名。
+ */
+function skipSeparateChinaSAR(props) {
+  const iso = String(props?.ISO_A3 || props?.ISO_A3_EH || props?.ADM0_ISO || "").toUpperCase();
+  const name = String(props?.NAME || props?.ADMIN || props?.NAME_ZH || "");
+  if (iso === "TWN" || iso === "HKG" || iso === "MAC") return true;
+  if (/^Taiwan$|^Hong Kong$|^Macao$|^Macau$/.test(name)) return true;
+  if (name.includes("台湾") || name.includes("香港") || name.includes("澳门")) return true;
+  return false;
+}
+
 function project(lon, lat, W, H) {
   return {
     x: ((lon + 180) / 360) * W,
@@ -242,6 +255,7 @@ export function drawOverlays(ctx, layers, t, opts) {
       theme === "atlas" ? "rgba(30, 40, 55, 0.45)" : "rgba(232, 238, 247, 0.35)";
     ctx.beginPath();
     for (const f of layers.countries.features) {
+      if (skipSeparateChinaSAR(f.properties)) continue;
       eachRing(f.geometry, (ring) => {
         for (let i = 0; i < ring.length; i++) {
           const [lon, lat] = ring[i];
@@ -375,6 +389,7 @@ export function drawOverlays(ctx, layers, t, opts) {
     let drawn = 0;
     for (const f of layers.countries.features) {
       const p = f.properties || {};
+      if (skipSeparateChinaSAR(p)) continue;
       const en = p.NAME || p.ADMIN || p.name || "";
       if (!en || en === "Antarctica") continue;
       if (needMajorOnly && !MAJOR_AT_ZOOM2.has(en)) continue;
